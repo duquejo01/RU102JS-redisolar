@@ -57,9 +57,21 @@ const updateOptimized = async (meterReading) => {
 
   // Load script if needed, uses cached SHA if already loaded.
   await compareAndUpdateScript.load();
+  
+  /**
+   * Performs a transaction between multiple commands.
+  */
+  const transaction = client.multi();
 
-  // START Challenge #3
-  // END Challenge #3
+  transaction.hsetAsync(key,'lastReportingTime',timeUtils.getCurrentTimestamp());
+  transaction.hincrbyAsync(key, 'meterReadingCount', 1);
+  transaction.expireAsync(key, weekSeconds);
+
+  transaction.evalshaAsync(compareAndUpdateScript.updateIfGreater(key, 'maxWhGenerated', meterReading.whGenerated));
+  transaction.evalshaAsync(compareAndUpdateScript.updateIfLess(key, 'minWhGenerated', meterReading.whGenerated));
+  transaction.evalshaAsync(compareAndUpdateScript.updateIfGreater(key, 'maxCapacity', meterReading.whGenerated - meterReading.whUsed));
+
+  await transaction.execAsync();
 };
 /* eslint-enable */
 
@@ -106,5 +118,6 @@ const updateBasic = async (meterReading) => {
 
 module.exports = {
   findById,
-  update: updateBasic, // updateOptimized
+  // update: updateBasic, // updateOptimized
+  update: updateOptimized
 };
